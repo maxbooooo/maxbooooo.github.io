@@ -4,6 +4,31 @@
   
   
   <entry>
+    <title>comment_test</title>
+    <link href="/2025/09/25/comment-test/"/>
+    <url>/2025/09/25/comment-test/</url>
+    
+    <content type="html"><![CDATA[<h2 id="这是一篇用来测试-Giscus-评论功能的文章"><a href="#这是一篇用来测试-Giscus-评论功能的文章" class="headerlink" title="这是一篇用来测试 Giscus 评论功能的文章"></a>这是一篇用来测试 Giscus 评论功能的文章</h2><p>你好！如果你能看到这篇文章，说明 Hexo 的文章生成功能是正常的。</p><p>这篇文章的目的非常简单：验证 Giscus 评论系统是否已经在我们的 Hexo 博客上配置成功并正确加载。</p><h3 id="测试清单"><a href="#测试清单" class="headerlink" title="测试清单"></a>测试清单</h3><p>为了让这个测试更像一篇真实的文章，这里列出了一些常见的 Markdown 元素：</p><ul><li>这是一个无序列表项。</li><li><strong>加粗文本</strong> 和 <em>斜体文本</em>。</li><li><code>行内代码</code> 示例。</li></ul><ol><li>这是一个有序列表项。</li><li>这是第二个有序列表项。</li></ol><blockquote><p>这是一个引用块。<br>Blockquotes are very useful in emphasizing text.</p></blockquote><p>下面是一个代码块示例：</p><pre><code class="language-bash"># 运行这个命令来清理缓存并启动本地服务器hexo clean &amp;&amp; hexo s</code></pre>]]></content>
+    
+    
+    <categories>
+      
+      <category>blog_test</category>
+      
+    </categories>
+    
+    
+    <tags>
+      
+      <tag>test</tag>
+      
+    </tags>
+    
+  </entry>
+  
+  
+  
+  <entry>
     <title>Hello World</title>
     <link href="/2025/09/24/hello-world/"/>
     <url>/2025/09/24/hello-world/</url>
