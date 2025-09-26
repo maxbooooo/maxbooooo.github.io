@@ -1,0 +1,702 @@
+
+
+<!DOCTYPE html>
+<html lang="en" data-default-color-scheme=auto>
+
+
+
+<head>
+  <meta charset="UTF-8">
+
+  <link rel="apple-touch-icon" sizes="76x76" href="/img/fluid.png">
+  <link rel="icon" href="/img/fluid.png">
+  
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, shrink-to-fit=no">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  
+  <meta name="theme-color" content="#2f4154">
+  <meta name="author" content="Simple">
+  <meta name="keywords" content="">
+  
+    <meta name="description" content="C++内存池及CUDA中的显存池学习记录最近在研究一个CUDA加速遗传算法的项目，由于对HPC缺乏足够的了解，有很多看不懂的代码，在这里记录一下学习过程。 内存池及显存池的基本原理库函数分配内存开销大在C++和CUDA编程中，如果每次分配内存都是使用库函数，需要操作系统进行交互，切换上下文，这种操作开销巨大。频繁地使用如malloc&#x2F;free进行内存分配的操作会十分耗时。 内存碎片内存碎">
+<meta property="og:type" content="article">
+<meta property="og:title" content="memory_pool">
+<meta property="og:url" content="https://maxbooooo.github.io/2025/09/26/memory-pool/index.html">
+<meta property="og:site_name" content="Simple&#39;s Blog">
+<meta property="og:description" content="C++内存池及CUDA中的显存池学习记录最近在研究一个CUDA加速遗传算法的项目，由于对HPC缺乏足够的了解，有很多看不懂的代码，在这里记录一下学习过程。 内存池及显存池的基本原理库函数分配内存开销大在C++和CUDA编程中，如果每次分配内存都是使用库函数，需要操作系统进行交互，切换上下文，这种操作开销巨大。频繁地使用如malloc&#x2F;free进行内存分配的操作会十分耗时。 内存碎片内存碎">
+<meta property="og:locale" content="en_US">
+<meta property="article:published_time" content="2025-09-26T02:08:48.000Z">
+<meta property="article:modified_time" content="2025-09-26T08:50:01.984Z">
+<meta property="article:author" content="Simple">
+<meta property="article:tag" content="C++">
+<meta property="article:tag" content="CUDA">
+<meta name="twitter:card" content="summary_large_image">
+  
+  
+  
+  <title>memory_pool - Simple&#39;s Blog</title>
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/twitter-bootstrap/4.6.1/css/bootstrap.min.css" />
+
+
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/github-markdown-css/4.0.0/github-markdown.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/hint.css/2.7.0/hint.min.css" />
+
+  <link  rel="stylesheet" href="https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.css" />
+
+
+
+<!-- 主题依赖的图标库，不要自行修改 -->
+<!-- Do not modify the link that theme dependent icons -->
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1749284_5i9bdhy70f8.css">
+
+
+
+<link rel="stylesheet" href="//at.alicdn.com/t/c/font_1736178_k526ubmyhba.css">
+
+
+<link  rel="stylesheet" href="/css/main.css" />
+
+
+  <link id="highlight-css" rel="stylesheet" href="/css/highlight.css" />
+  
+    <link id="highlight-css-dark" rel="stylesheet" href="/css/highlight-dark.css" />
+  
+
+
+
+
+  <script id="fluid-configs">
+    var Fluid = window.Fluid || {};
+    Fluid.ctx = Object.assign({}, Fluid.ctx)
+    var CONFIG = {"hostname":"maxbooooo.github.io","root":"/","version":"1.9.8","typing":{"enable":true,"typeSpeed":70,"cursorChar":"_","loop":false,"scope":[]},"anchorjs":{"enable":true,"element":"h1,h2,h3,h4,h5,h6","placement":"left","visible":"hover","icon":""},"progressbar":{"enable":true,"height_px":3,"color":"#29d","options":{"showSpinner":false,"trickleSpeed":100}},"code_language":{"enable":true,"default":"TEXT"},"copy_btn":true,"image_caption":{"enable":true},"image_zoom":{"enable":true,"img_url_replace":["",""]},"toc":{"enable":true,"placement":"right","headingSelector":"h1,h2,h3,h4,h5,h6","collapseDepth":0},"lazyload":{"enable":true,"loading_img":"/img/loading.gif","onlypost":false,"offset_factor":2},"web_analytics":{"enable":false,"follow_dnt":true,"baidu":null,"google":{"measurement_id":null},"tencent":{"sid":null,"cid":null},"leancloud":{"app_id":null,"app_key":null,"server_url":null,"path":"window.location.pathname","ignore_local":false},"umami":{"src":null,"website_id":null,"domains":null,"start_time":"2024-01-01T00:00:00.000Z","token":null,"api_server":null}},"search_path":"/local-search.xml","include_content_in_search":true};
+
+    if (CONFIG.web_analytics.follow_dnt) {
+      var dntVal = navigator.doNotTrack || window.doNotTrack || navigator.msDoNotTrack;
+      Fluid.ctx.dnt = dntVal && (dntVal.startsWith('1') || dntVal.startsWith('yes') || dntVal.startsWith('on'));
+    }
+  </script>
+  <script  src="/js/utils.js" ></script>
+  <script  src="/js/color-schema.js" ></script>
+  
+
+
+  
+<meta name="generator" content="Hexo 8.0.0"></head>
+
+
+<body>
+  
+
+  <header>
+    
+
+<div class="header-inner" style="height: 70vh;">
+  <nav id="navbar" class="navbar fixed-top  navbar-expand-lg navbar-dark scrolling-navbar">
+  <div class="container">
+    <a class="navbar-brand" href="/">
+      <strong>Simple</strong>
+    </a>
+
+    <button id="navbar-toggler-btn" class="navbar-toggler" type="button" data-toggle="collapse"
+            data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+      <div class="animated-icon"><span></span><span></span><span></span></div>
+    </button>
+
+    <!-- Collapsible content -->
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+      <ul class="navbar-nav ml-auto text-center">
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/" target="_self">
+                <i class="iconfont icon-home-fill"></i>
+                <span>Home</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/archives/" target="_self">
+                <i class="iconfont icon-archive-fill"></i>
+                <span>Archives</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/categories/" target="_self">
+                <i class="iconfont icon-category-fill"></i>
+                <span>Categories</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/tags/" target="_self">
+                <i class="iconfont icon-tags-fill"></i>
+                <span>Tags</span>
+              </a>
+            </li>
+          
+        
+          
+          
+          
+          
+            <li class="nav-item">
+              <a class="nav-link" href="/about/" target="_self">
+                <i class="iconfont icon-user-fill"></i>
+                <span>About</span>
+              </a>
+            </li>
+          
+        
+        
+          <li class="nav-item" id="search-btn">
+            <a class="nav-link" target="_self" href="javascript:;" data-toggle="modal" data-target="#modalSearch" aria-label="Search">
+              <i class="iconfont icon-search"></i>
+            </a>
+          </li>
+          
+        
+        
+          <li class="nav-item" id="color-toggle-btn">
+            <a class="nav-link" target="_self" href="javascript:;" aria-label="Color Toggle">
+              <i class="iconfont icon-dark" id="color-toggle-icon"></i>
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</nav>
+
+  
+
+<div id="banner" class="banner" parallax=true
+     style="background: url('/img/default.png') no-repeat center center; background-size: cover;">
+  <div class="full-bg-img">
+    <div class="mask flex-center" style="background-color: rgba(0, 0, 0, 0.3)">
+      <div class="banner-text text-center fade-in-up">
+        <div class="h2">
+          
+            <span id="subtitle" data-typed-text="memory_pool"></span>
+          
+        </div>
+
+        
+          
+  <div class="mt-3">
+    
+    
+      <span class="post-meta">
+        <i class="iconfont icon-date-fill" aria-hidden="true"></i>
+        <time datetime="2025-09-26 10:08" pubdate>
+          September 26, 2025 am
+        </time>
+      </span>
+    
+  </div>
+
+  <div class="mt-1">
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-chart"></i>
+        
+          1.8k words
+        
+      </span>
+    
+
+    
+      <span class="post-meta mr-2">
+        <i class="iconfont icon-clock-fill"></i>
+        
+        
+        
+          16 mins
+        
+      </span>
+    
+
+    
+    
+  </div>
+
+
+        
+      </div>
+
+      
+    </div>
+  </div>
+</div>
+
+</div>
+
+  </header>
+
+  <main>
+    
+      
+
+<div class="container-fluid nopadding-x">
+  <div class="row nomargin-x">
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+
+    </div>
+
+    <div class="col-lg-8 nopadding-x-md">
+      <div class="container nopadding-x-md" id="board-ctn">
+        <div id="board">
+          <article class="post-content mx-auto">
+            <h1 id="seo-header">memory_pool</h1>
+            
+            
+              <div class="markdown-body">
+                
+                <h1 id="C-内存池及CUDA中的显存池学习记录"><a href="#C-内存池及CUDA中的显存池学习记录" class="headerlink" title="C++内存池及CUDA中的显存池学习记录"></a>C++内存池及CUDA中的显存池学习记录</h1><p>最近在研究一个CUDA加速遗传算法的项目，由于对HPC缺乏足够的了解，有很多看不懂的代码，在这里记录一下学习过程。</p>
+<h2 id="内存池及显存池的基本原理"><a href="#内存池及显存池的基本原理" class="headerlink" title="内存池及显存池的基本原理"></a>内存池及显存池的基本原理</h2><h3 id="库函数分配内存开销大"><a href="#库函数分配内存开销大" class="headerlink" title="库函数分配内存开销大"></a>库函数分配内存开销大</h3><p>在C++和CUDA编程中，如果每次分配内存都是使用库函数，需要操作系统进行交互，切换上下文，这种操作开销巨大。频繁地使用如malloc&#x2F;free进行内存分配的操作会十分耗时。</p>
+<h3 id="内存碎片"><a href="#内存碎片" class="headerlink" title="内存碎片"></a>内存碎片</h3><p>内存碎片指的是由于分配内存时，根据分配的内存大小，会出现将一大块内存分割成小块的内存分配出去。在经过多次分配后，可能会出现剩余内存容量足够，但是找不到一块完整的足够大的内存可供分配，降低了内存的使用率。</p>
+<p>以上提及的两种情况，影响了内存的使用效率。内存池和显存池的基本原理就是预先分配一部分内存出来，将这部分内存作为内存池，每次分配内存时，就在这部分内存进行交互。这样，只需要与操作系统交互一次，大大提升了内存分配的效率，节省了所需要的时间。同时，将内存池分块为大小一样的小内存块，每次出现比它更小的内存申请时，直接将整块内存分配给它。这样，可以大大减少内存碎片的出现。当然，这样的操作也会出现问题，比如大量的小内存申请，导致内存的利用率很低，还有无法处理比内存块更大的内存分配请求。这些问题需要使用更高级的内存池管理策略。</p>
+<h2 id="C-固定大小内存池实现"><a href="#C-固定大小内存池实现" class="headerlink" title="C++固定大小内存池实现"></a>C++固定大小内存池实现</h2><p>代码由AI生成</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// MemoryPool.h</span><br><br><span class="hljs-meta">#<span class="hljs-keyword">ifndef</span> MEMORY_POOL_H</span><br><span class="hljs-meta">#<span class="hljs-keyword">define</span> MEMORY_POOL_H</span><br><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;cstddef&gt;</span> <span class="hljs-comment">// for size_t</span></span><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;iostream&gt;</span></span><br><br><span class="hljs-keyword">class</span> <span class="hljs-title class_">MemoryPool</span> &#123;<br><span class="hljs-keyword">public</span>:<br>    <span class="hljs-comment">/**</span><br><span class="hljs-comment">     * @brief 构造函数</span><br><span class="hljs-comment">     * @param blockSize 每个内存块的大小（字节）</span><br><span class="hljs-comment">     * @param blockCount 内存池中的总块数</span><br><span class="hljs-comment">     */</span><br>    <span class="hljs-built_in">MemoryPool</span>(<span class="hljs-type">size_t</span> blockSize, <span class="hljs-type">size_t</span> blockCount);<br><br>    <span class="hljs-comment">/**</span><br><span class="hljs-comment">     * @brief 析构函数，释放整个内存池</span><br><span class="hljs-comment">     */</span><br>    ~<span class="hljs-built_in">MemoryPool</span>();<br><br>    <span class="hljs-comment">// 禁用拷贝构造和赋值操作</span><br>    <span class="hljs-built_in">MemoryPool</span>(<span class="hljs-type">const</span> MemoryPool&amp;) = <span class="hljs-keyword">delete</span>;<br>    MemoryPool&amp; <span class="hljs-keyword">operator</span>=(<span class="hljs-type">const</span> MemoryPool&amp;) = <span class="hljs-keyword">delete</span>;<br><br>    <span class="hljs-comment">/**</span><br><span class="hljs-comment">     * @brief 从内存池中分配一个内存块</span><br><span class="hljs-comment">     * @return 返回可用内存块的指针，如果无可用块则返回 nullptr</span><br><span class="hljs-comment">     */</span><br>    <span class="hljs-function"><span class="hljs-type">void</span>* <span class="hljs-title">allocate</span><span class="hljs-params">()</span></span>;<br><br>    <span class="hljs-comment">/**</span><br><span class="hljs-comment">     * @brief 将一个内存块归还给内存池</span><br><span class="hljs-comment">     * @param p 要归还的内存块指针</span><br><span class="hljs-comment">     */</span><br>    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">deallocate</span><span class="hljs-params">(<span class="hljs-type">void</span>* p)</span></span>;<br><br><span class="hljs-keyword">private</span>:<br>    <span class="hljs-comment">// 指向整个内存池块的指针</span><br>    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>* m_pPool;<br><br>    <span class="hljs-comment">// 指向空闲内存块链表的头指针</span><br>    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>* m_pFreeBlock;<br><br>    <span class="hljs-comment">// 每个内存块的大小</span><br>    <span class="hljs-type">size_t</span> m_blockSize;<br><br>    <span class="hljs-comment">// 内存块的总数</span><br>    <span class="hljs-type">size_t</span> m_blockCount;<br>&#125;;<br><br><span class="hljs-meta">#<span class="hljs-keyword">endif</span> <span class="hljs-comment">// MEMORY_POOL_H</span></span><br></code></pre></td></tr></table></figure>
+
+<p>上面为头文件的实现过程，使用unsigned char*保证以字节（Byte）为单位的指针运算，执行p+1的时候能保证地址的位移量为1。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// MemoryPool.cpp</span><br><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;MemoryPool.h&quot;</span></span><br><br>MemoryPool::<span class="hljs-built_in">MemoryPool</span>(<span class="hljs-type">size_t</span> blockSize, <span class="hljs-type">size_t</span> blockCount)<br>    : <span class="hljs-built_in">m_pPool</span>(<span class="hljs-literal">nullptr</span>), <span class="hljs-built_in">m_pFreeBlock</span>(<span class="hljs-literal">nullptr</span>), <span class="hljs-built_in">m_blockSize</span>(blockSize), <span class="hljs-built_in">m_blockCount</span>(blockCount) &#123;<br>  <br>    <span class="hljs-comment">// 保证每个块至少能容纳一个指针的大小</span><br>    <span class="hljs-keyword">if</span> (m_blockSize &lt; <span class="hljs-built_in">sizeof</span>(<span class="hljs-type">void</span>*)) &#123;<br>        m_blockSize = <span class="hljs-built_in">sizeof</span>(<span class="hljs-type">void</span>*);<br>    &#125;<br>  <br>    <span class="hljs-comment">// 计算总大小并向系统申请内存</span><br>    <span class="hljs-type">size_t</span> totalSize = m_blockSize * m_blockCount;<br>    m_pPool = <span class="hljs-keyword">new</span> <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>[totalSize];<br>    <span class="hljs-keyword">if</span> (!m_pPool) &#123;<br>        <span class="hljs-comment">// 内存分配失败</span><br>        <span class="hljs-keyword">return</span>;<br>    &#125;<br><br>    <span class="hljs-comment">// 初始化空闲链表</span><br>    m_pFreeBlock = m_pPool;<br>    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>* pCurrent = m_pPool;<br>    <span class="hljs-keyword">for</span> (<span class="hljs-type">size_t</span> i = <span class="hljs-number">0</span>; i &lt; m_blockCount - <span class="hljs-number">1</span>; ++i) &#123;<br>        <span class="hljs-comment">// 将当前块的头部强制转换为一个指向下一个块的指针</span><br>        <span class="hljs-comment">// 这就是空闲链表的 &quot;next&quot; 指针</span><br>        *(<span class="hljs-built_in">reinterpret_cast</span>&lt;<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>**&gt;(pCurrent)) = pCurrent + m_blockSize;<br>        pCurrent += m_blockSize;<br>    &#125;<br><br>    <span class="hljs-comment">// 最后一个块的 &quot;next&quot; 指针指向 nullptr</span><br>    *(<span class="hljs-built_in">reinterpret_cast</span>&lt;<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>**&gt;(pCurrent)) = <span class="hljs-literal">nullptr</span>;<br>&#125;<br><br>MemoryPool::~<span class="hljs-built_in">MemoryPool</span>() &#123;<br>    <span class="hljs-keyword">delete</span>[] m_pPool;<br>    m_pPool = <span class="hljs-literal">nullptr</span>;<br>&#125;<br><br><span class="hljs-function"><span class="hljs-type">void</span>* <span class="hljs-title">MemoryPool::allocate</span><span class="hljs-params">()</span> </span>&#123;<br>    <span class="hljs-keyword">if</span> (m_pFreeBlock == <span class="hljs-literal">nullptr</span>) &#123;<br>        <span class="hljs-comment">// 内存池已满，没有可用的块</span><br>        <span class="hljs-keyword">return</span> <span class="hljs-literal">nullptr</span>;<br>    &#125;<br><br>    <span class="hljs-comment">// 从空闲链表头部取下一个块</span><br>    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>* pAllocatedBlock = m_pFreeBlock;<br>  <br>    <span class="hljs-comment">// 更新空闲链表的头指针，使其指向下一个空闲块</span><br>    <span class="hljs-comment">// 下一个空闲块的地址就存储在当前块的头部</span><br>    m_pFreeBlock = *(<span class="hljs-built_in">reinterpret_cast</span>&lt;<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>**&gt;(pAllocatedBlock));<br><br>    <span class="hljs-keyword">return</span> pAllocatedBlock;<br>&#125;<br><br><span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">MemoryPool::deallocate</span><span class="hljs-params">(<span class="hljs-type">void</span>* p)</span> </span>&#123;<br>    <span class="hljs-keyword">if</span> (p == <span class="hljs-literal">nullptr</span>) &#123;<br>        <span class="hljs-keyword">return</span>;<br>    &#125;<br>  <br>    <span class="hljs-comment">// 将归还的块强制转换类型</span><br>    <span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>* pDeallocatedBlock = <span class="hljs-built_in">static_cast</span>&lt;<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>*&gt;(p);<br>  <br>    <span class="hljs-comment">// 将归还的块的头部设置为指向当前的空闲链表头</span><br>    *(<span class="hljs-built_in">reinterpret_cast</span>&lt;<span class="hljs-type">unsigned</span> <span class="hljs-type">char</span>**&gt;(pDeallocatedBlock)) = m_pFreeBlock;<br>  <br>    <span class="hljs-comment">// 更新空闲链表头，使其指向刚刚归还的块</span><br>    <span class="hljs-comment">// 这样就完成了将块插回链表头的操作</span><br>    m_pFreeBlock = pDeallocatedBlock;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>上面的代码为函数中的具体实现，<code>m_blockSize = sizeof(void*);</code>保证了内存块至少能装的下一个指针的大小，使得内存块能够成一个链表。</p>
+<figure class="highlight c++"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br></pre></td><td class="code"><pre><code class="hljs C++"><span class="hljs-comment">// main.cpp</span><br><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&quot;MemoryPool.h&quot;</span></span><br><span class="hljs-meta">#<span class="hljs-keyword">include</span> <span class="hljs-string">&lt;vector&gt;</span></span><br><br><span class="hljs-keyword">class</span> <span class="hljs-title class_">MyObject</span> &#123;<br><span class="hljs-keyword">public</span>:<br>    <span class="hljs-built_in">MyObject</span>(<span class="hljs-type">int</span> a, <span class="hljs-type">int</span> b) : <span class="hljs-built_in">x</span>(a), <span class="hljs-built_in">y</span>(b) &#123;<br>        std::cout &lt;&lt; <span class="hljs-string">&quot;MyObject(&quot;</span> &lt;&lt; x &lt;&lt; <span class="hljs-string">&quot;, &quot;</span> &lt;&lt; y &lt;&lt; <span class="hljs-string">&quot;) constructed.&quot;</span> &lt;&lt; std::endl;<br>    &#125;<br><br>    ~<span class="hljs-built_in">MyObject</span>() &#123;<br>        std::cout &lt;&lt; <span class="hljs-string">&quot;MyObject(&quot;</span> &lt;&lt; x &lt;&lt; <span class="hljs-string">&quot;, &quot;</span> &lt;&lt; y &lt;&lt; <span class="hljs-string">&quot;) destructed.&quot;</span> &lt;&lt; std::endl;<br>    &#125;<br><br>    <span class="hljs-function"><span class="hljs-type">void</span> <span class="hljs-title">print</span><span class="hljs-params">()</span> <span class="hljs-type">const</span> </span>&#123;<br>        std::cout &lt;&lt; <span class="hljs-string">&quot;x = &quot;</span> &lt;&lt; x &lt;&lt; <span class="hljs-string">&quot;, y = &quot;</span> &lt;&lt; y &lt;&lt; std::endl;<br>    &#125;<br><br><span class="hljs-keyword">private</span>:<br>    <span class="hljs-type">int</span> x, y;<br>    <span class="hljs-comment">// 为了演示，可以增加一些数据成员让对象变大</span><br>    <span class="hljs-comment">// char data[24]; </span><br>&#125;;<br><br><span class="hljs-function"><span class="hljs-type">int</span> <span class="hljs-title">main</span><span class="hljs-params">()</span> </span>&#123;<br>    <span class="hljs-comment">// 创建一个内存池，用于分配 MyObject 对象</span><br>    <span class="hljs-comment">// 每个块大小为 sizeof(MyObject)，总共可以分配 10 个对象</span><br>    std::cout &lt;&lt; <span class="hljs-string">&quot;Creating a memory pool for 10 MyObject instances.&quot;</span> &lt;&lt; std::endl;<br>    <span class="hljs-function">MemoryPool <span class="hljs-title">pool</span><span class="hljs-params">(<span class="hljs-keyword">sizeof</span>(MyObject), <span class="hljs-number">10</span>)</span></span>;<br><br>    std::vector&lt;MyObject*&gt; objects;<br><br>    <span class="hljs-comment">// 1. 分配对象直到内存池耗尽</span><br>    std::cout &lt;&lt; <span class="hljs-string">&quot;\n--- Allocating objects ---&quot;</span> &lt;&lt; std::endl;<br>    <span class="hljs-keyword">for</span> (<span class="hljs-type">int</span> i = <span class="hljs-number">0</span>; i &lt; <span class="hljs-number">12</span>; ++i) &#123;<br>        <span class="hljs-type">void</span>* mem = pool.<span class="hljs-built_in">allocate</span>();<br>        <span class="hljs-keyword">if</span> (mem) &#123;<br>            <span class="hljs-comment">// 使用 placement new 在分配的内存上构造对象</span><br>            MyObject* obj = <span class="hljs-built_in">new</span> (mem) <span class="hljs-built_in">MyObject</span>(i, i * <span class="hljs-number">10</span>);<br>            objects.<span class="hljs-built_in">push_back</span>(obj);<br>            std::cout &lt;&lt; <span class="hljs-string">&quot;Allocated object &quot;</span> &lt;&lt; i &lt;&lt; <span class="hljs-string">&quot; at address &quot;</span> &lt;&lt; obj &lt;&lt; std::endl;<br>        &#125; <span class="hljs-keyword">else</span> &#123;<br>            std::cout &lt;&lt; <span class="hljs-string">&quot;Allocation failed for object &quot;</span> &lt;&lt; i &lt;&lt; <span class="hljs-string">&quot;. Pool is full.&quot;</span> &lt;&lt; std::endl;<br>        &#125;<br>    &#125;<br><br>    <span class="hljs-comment">// 打印所有成功分配的对象</span><br>    std::cout &lt;&lt; <span class="hljs-string">&quot;\n--- Printing allocated objects ---&quot;</span> &lt;&lt; std::endl;<br>    <span class="hljs-keyword">for</span> (<span class="hljs-type">const</span> <span class="hljs-keyword">auto</span>* obj : objects) &#123;<br>        obj-&gt;<span class="hljs-built_in">print</span>();<br>    &#125;<br><br>    <span class="hljs-comment">// 2. 销毁并归还一半的对象</span><br>    std::cout &lt;&lt; <span class="hljs-string">&quot;\n--- Deallocating half of the objects ---&quot;</span> &lt;&lt; std::endl;<br>    <span class="hljs-keyword">for</span> (<span class="hljs-type">size_t</span> i = <span class="hljs-number">0</span>; i &lt; objects.<span class="hljs-built_in">size</span>() / <span class="hljs-number">2</span>; ++i) &#123;<br>        MyObject* obj = objects[i];<br>        std::cout &lt;&lt; <span class="hljs-string">&quot;Deallocating object at address &quot;</span> &lt;&lt; obj &lt;&lt; std::endl;<br>        <span class="hljs-comment">// 显式调用析构函数</span><br>        obj-&gt;~<span class="hljs-built_in">MyObject</span>();<br>        <span class="hljs-comment">// 将内存归还给内存池</span><br>        pool.<span class="hljs-built_in">deallocate</span>(obj);<br>    &#125;<br>  <br>    <span class="hljs-comment">// 3. 尝试再次分配</span><br>    std::cout &lt;&lt; <span class="hljs-string">&quot;\n--- Trying to allocate again ---&quot;</span> &lt;&lt; std::endl;<br>    <span class="hljs-type">void</span>* mem = pool.<span class="hljs-built_in">allocate</span>();<br>    <span class="hljs-keyword">if</span> (mem) &#123;<br>        MyObject* obj = <span class="hljs-built_in">new</span> (mem) <span class="hljs-built_in">MyObject</span>(<span class="hljs-number">100</span>, <span class="hljs-number">1000</span>);<br>        std::cout &lt;&lt; <span class="hljs-string">&quot;Successfully re-allocated an object at address &quot;</span> &lt;&lt; obj &lt;&lt; std::endl;<br>        obj-&gt;<span class="hljs-built_in">print</span>();<br>      <br>        <span class="hljs-comment">// 清理这个新对象</span><br>        obj-&gt;~<span class="hljs-built_in">MyObject</span>();<br>        pool.<span class="hljs-built_in">deallocate</span>(obj);<br>    &#125; <span class="hljs-keyword">else</span> &#123;<br>        std::cout &lt;&lt; <span class="hljs-string">&quot;Re-allocation failed.&quot;</span> &lt;&lt; std::endl;<br>    &#125;<br><br><br>    std::cout &lt;&lt; <span class="hljs-string">&quot;\n--- Clean up remaining objects ---&quot;</span> &lt;&lt; std::endl;<br>    <span class="hljs-comment">// 在程序结束前，销毁并归还所有剩余的对象</span><br>    <span class="hljs-keyword">for</span> (<span class="hljs-type">size_t</span> i = objects.<span class="hljs-built_in">size</span>() / <span class="hljs-number">2</span>; i &lt; objects.<span class="hljs-built_in">size</span>(); ++i) &#123;<br>        MyObject* obj = objects[i];<br>         std::cout &lt;&lt; <span class="hljs-string">&quot;Deallocating object at address &quot;</span> &lt;&lt; obj &lt;&lt; std::endl;<br>        obj-&gt;~<span class="hljs-built_in">MyObject</span>();<br>        pool.<span class="hljs-built_in">deallocate</span>(obj);<br>    &#125;<br>  <br>    <span class="hljs-comment">// 当 main 函数结束时，pool 对象会被销毁，其析构函数会自动释放所有内存</span><br>    std::cout &lt;&lt; <span class="hljs-string">&quot;\n--- Exiting main, pool will be destroyed ---&quot;</span> &lt;&lt; std::endl;<br>    <span class="hljs-keyword">return</span> <span class="hljs-number">0</span>;<br>&#125;<br></code></pre></td></tr></table></figure>
+
+<p>这段代码是一段内存池使用的示例代码。以上三段代码，注释比较详细，实现了一个简单的固定大小内存池，将所有小内存块通过链表连接，每次分配时，分配头部内存块。每次归还时，也是放到头部，并与之前的空闲头部内存块连接。有兴趣的朋友可以继续深入下去，研究更复杂的内存池的原理及实现。</p>
+
+                
+              </div>
+            
+            <hr/>
+            <div>
+              <div class="post-metas my-3">
+  
+    <div class="post-meta mr-3 d-flex align-items-center">
+      <i class="iconfont icon-category"></i>
+      
+
+<span class="category-chains">
+  
+  
+    
+      <span class="category-chain">
+        
+  <a href="/categories/HPC/" class="category-chain-item">HPC</a>
+  
+  
+
+      </span>
+    
+  
+</span>
+
+    </div>
+  
+  
+    <div class="post-meta">
+      <i class="iconfont icon-tags"></i>
+      
+        <a href="/tags/C/" class="print-no-link">#C++</a>
+      
+        <a href="/tags/CUDA/" class="print-no-link">#CUDA</a>
+      
+    </div>
+  
+</div>
+
+
+              
+  
+
+  <div class="license-box my-3">
+    <div class="license-title">
+      <div>memory_pool</div>
+      <div>https://maxbooooo.github.io/2025/09/26/memory-pool/</div>
+    </div>
+    <div class="license-meta">
+      
+        <div class="license-meta-item">
+          <div>Author</div>
+          <div>Simple</div>
+        </div>
+      
+      
+        <div class="license-meta-item license-meta-date">
+          <div>Posted on</div>
+          <div>September 26, 2025</div>
+        </div>
+      
+      
+      
+        <div class="license-meta-item">
+          <div>Licensed under</div>
+          <div>
+            
+              
+              
+                <a class="print-no-link" target="_blank" href="https://creativecommons.org/licenses/by/4.0/">
+                  <span class="hint--top hint--rounded" aria-label="BY - Attribution">
+                    <i class="iconfont icon-cc-by"></i>
+                  </span>
+                </a>
+              
+            
+          </div>
+        </div>
+      
+    </div>
+    <div class="license-icon iconfont"></div>
+  </div>
+
+
+
+              
+                <div class="post-prevnext my-3">
+                  <article class="post-prev col-6">
+                    
+                    
+                  </article>
+                  <article class="post-next col-6">
+                    
+                    
+                      <a href="/2025/09/25/comment-test/" title="comment_test">
+                        <span class="hidden-mobile">comment_test</span>
+                        <span class="visible-mobile">Next</span>
+                        <i class="iconfont icon-arrowright"></i>
+                      </a>
+                    
+                  </article>
+                </div>
+              
+            </div>
+
+            
+  
+  
+    <article id="comments" lazyload>
+      
+    <div id="giscus" class="giscus"></div>
+    <script type="text/javascript">
+      Fluid.utils.loadComments('#giscus', function() {
+        var options = {"repo":"maxbooooo/maxbooooo.github.io","repo-id":"R_kgDOP2Jvmw","category":"General","category-id":"DIC_kwDOP2Jvm84Cv3vz","theme-light":"light","theme-dark":"dark","mapping":"pathname","reactions-enabled":1,"emit-metadata":0,"input-position":"bottom","lang":"en","enable":true};
+        var attributes = {};
+        for (let option in options) {
+          if (!option.startsWith('theme-')) {
+            var key = option.startsWith('data-') ? option : 'data-' + option;
+            attributes[key] = options[option];
+          }
+        }
+        var light = 'light';
+        var dark = 'dark';
+        window.GiscusThemeLight = light;
+        window.GiscusThemeDark = dark;
+        attributes['data-theme'] = document.documentElement.getAttribute('data-user-color-scheme') === 'dark' ? dark : light;
+        for (let attribute in attributes) {
+          var value = attributes[attribute];
+          if (value === undefined || value === null || value === '') {
+            delete attributes[attribute];
+          }
+        }
+        var s = document.createElement('script');
+        s.setAttribute('src', 'https://giscus.app/client.js');
+        s.setAttribute('crossorigin', 'anonymous');
+        for (let attribute in attributes) {
+          s.setAttribute(attribute, attributes[attribute]);
+        }
+        var ss = document.getElementsByTagName('script');
+        var e = ss.length > 0 ? ss[ss.length - 1] : document.head || document.documentElement;
+        e.parentNode.insertBefore(s, e.nextSibling);
+      });
+    </script>
+    <noscript>Please enable JavaScript to view the comments</noscript>
+
+
+    </article>
+  
+
+
+          </article>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-col d-none d-lg-block col-lg-2">
+      
+  <aside class="sidebar" style="margin-left: -1rem">
+    <div id="toc">
+  <p class="toc-header">
+    <i class="iconfont icon-list"></i>
+    <span>Table of Contents</span>
+  </p>
+  <div class="toc-body" id="toc-body"></div>
+</div>
+
+
+
+  </aside>
+
+
+    </div>
+  </div>
+</div>
+
+
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+  
+
+
+
+
+
+
+
+    
+
+    
+      <a id="scroll-top-button" aria-label="TOP" href="#" role="button">
+        <i class="iconfont icon-arrowup" aria-hidden="true"></i>
+      </a>
+    
+
+    
+      <div class="modal fade" id="modalSearch" tabindex="-1" role="dialog" aria-labelledby="ModalLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header text-center">
+        <h4 class="modal-title w-100 font-weight-bold">Search</h4>
+        <button type="button" id="local-search-close" class="close" data-dismiss="modal" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+      <div class="modal-body mx-3">
+        <div class="md-form mb-5">
+          <input type="text" id="local-search-input" class="form-control validate">
+          <label data-error="x" data-success="v" for="local-search-input">Keyword</label>
+        </div>
+        <div class="list-group" id="local-search-result"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+    
+
+    
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+  
+    <div class="footer-content">
+       <a href="https://hexo.io" target="_blank" rel="nofollow noopener"><span>Hexo</span></a> <i class="iconfont icon-love"></i> <a href="https://github.com/fluid-dev/hexo-theme-fluid" target="_blank" rel="nofollow noopener"><span>Fluid</span></a> 
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+
+  <!-- Scripts -->
+  
+  <script  src="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.js" ></script>
+  <link  rel="stylesheet" href="https://lib.baomitu.com/nprogress/0.2.0/nprogress.min.css" />
+
+  <script>
+    NProgress.configure({"showSpinner":false,"trickleSpeed":100})
+    NProgress.start()
+    window.addEventListener('load', function() {
+      NProgress.done();
+    })
+  </script>
+
+
+<script  src="https://lib.baomitu.com/jquery/3.6.4/jquery.min.js" ></script>
+<script  src="https://lib.baomitu.com/twitter-bootstrap/4.6.1/js/bootstrap.min.js" ></script>
+<script  src="/js/events.js" ></script>
+<script  src="/js/plugins.js" ></script>
+
+
+  <script  src="https://lib.baomitu.com/typed.js/2.0.12/typed.min.js" ></script>
+  <script>
+    (function (window, document) {
+      var typing = Fluid.plugins.typing;
+      var subtitle = document.getElementById('subtitle');
+      if (!subtitle || !typing) {
+        return;
+      }
+      var text = subtitle.getAttribute('data-typed-text');
+      
+        typing(text);
+      
+    })(window, document);
+  </script>
+
+
+
+
+  
+    <script  src="/js/img-lazyload.js" ></script>
+  
+
+
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/tocbot/4.20.1/tocbot.min.js', function() {
+    var toc = jQuery('#toc');
+    if (toc.length === 0 || !window.tocbot) { return; }
+    var boardCtn = jQuery('#board-ctn');
+    var boardTop = boardCtn.offset().top;
+
+    window.tocbot.init(Object.assign({
+      tocSelector     : '#toc-body',
+      contentSelector : '.markdown-body',
+      linkClass       : 'tocbot-link',
+      activeLinkClass : 'tocbot-active-link',
+      listClass       : 'tocbot-list',
+      isCollapsedClass: 'tocbot-is-collapsed',
+      collapsibleClass: 'tocbot-is-collapsible',
+      scrollSmooth    : true,
+      includeTitleTags: true,
+      headingsOffset  : -boardTop,
+    }, CONFIG.toc));
+    if (toc.find('.toc-list-item').length > 0) {
+      toc.css('visibility', 'visible');
+    }
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('tocbot' in window) {
+        tocbot.refresh();
+        var toc = jQuery('#toc');
+        if (toc.length === 0 || !tocbot) {
+          return;
+        }
+        if (toc.find('.toc-list-item').length > 0) {
+          toc.css('visibility', 'visible');
+        }
+      }
+    });
+  });
+</script>
+
+
+  <script src=https://lib.baomitu.com/clipboard.js/2.0.11/clipboard.min.js></script>
+
+  <script>Fluid.plugins.codeWidget();</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/anchor-js/5.0.0/anchor.min.js', function() {
+    window.anchors.options = {
+      placement: CONFIG.anchorjs.placement,
+      visible  : CONFIG.anchorjs.visible
+    };
+    if (CONFIG.anchorjs.icon) {
+      window.anchors.options.icon = CONFIG.anchorjs.icon;
+    }
+    var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+    var res = [];
+    for (var item of el) {
+      res.push('.markdown-body > ' + item.trim());
+    }
+    if (CONFIG.anchorjs.placement === 'left') {
+      window.anchors.options.class = 'anchorjs-link-left';
+    }
+    window.anchors.add(res.join(', '));
+
+    Fluid.events.registerRefreshCallback(function() {
+      if ('anchors' in window) {
+        anchors.removeAll();
+        var el = (CONFIG.anchorjs.element || 'h1,h2,h3,h4,h5,h6').split(',');
+        var res = [];
+        for (var item of el) {
+          res.push('.markdown-body > ' + item.trim());
+        }
+        if (CONFIG.anchorjs.placement === 'left') {
+          anchors.options.class = 'anchorjs-link-left';
+        }
+        anchors.add(res.join(', '));
+      }
+    });
+  });
+</script>
+
+
+  
+<script>
+  Fluid.utils.createScript('https://lib.baomitu.com/fancybox/3.5.7/jquery.fancybox.min.js', function() {
+    Fluid.plugins.fancyBox();
+  });
+</script>
+
+
+  <script>Fluid.plugins.imageCaption();</script>
+
+  <script  src="/js/local-search.js" ></script>
+
+
+
+
+
+<!-- 主题的启动项，将它保持在最底部 -->
+<!-- the boot of the theme, keep it at the bottom -->
+<script  src="/js/boot.js" ></script>
+
+
+  
+
+  <noscript>
+    <div class="noscript-warning">Blog works best with JavaScript enabled</div>
+  </noscript>
+</body>
+</html>
